@@ -14,7 +14,15 @@ if (Meteor.isClient) {
     },
     hideCompleted: function () {
       return Session.get("hideCompleted");
+    },
+    // counts all uncompleted tasks
+    incompleteCount: function () {
+      return Tasks.find({ checked: { $ne: true}}).count();
     }
+  });
+
+  Accounts.ui.config({
+    passwordSignupFields: "USERNAME_ONLY"
   });
 
   Template.body.events({
@@ -23,10 +31,7 @@ if (Meteor.isClient) {
 
       var text = event.target.text.value;
 
-      Tasks.insert({
-        text: text,
-        createdAt: new Date() // current time
-      });
+      Meteor.call("addTask", text);
 
       // Clear form
       event.target.text.value = "";
@@ -37,17 +42,40 @@ if (Meteor.isClient) {
     },
 
     "change .hide-completed input": function (event) {
-      Session.set("hideCompleted", event.target.checked)
+      Session.set("hideCompleted", event.target.checked);
     }
   });
 
   Template.task.events({
     "click .toggled-checked": function(){
-      Tasks.update(this._id, { $set: {checked: ! this.checked}})
+      Meteor.call("setChecked", this._id, ! this.checked);
     },
 
     "click .delete": function(){
-      Tasks.remove(this._id);
+      Meteor.call("deleteTask", this._id);
     }
   });
 }
+
+Meteor.methods({
+  addTask: function(text) {
+    if(! Meteor.userId()) {
+      throw new Meteor.Error("not-authorized");
+    }
+
+    Tasks.insert({
+      text: text,
+      createdAt: new Date(),
+      owner: Meteor.userId(),
+      username: Meteor.user().username
+    });
+  },
+
+  deleteTask: function(taskId){
+    Tasks.remove(taskId);
+  },
+
+  setChecked: function(taskId, setChecked){
+    Tasks.update(taskId, {$set: { checked: setChecked}});
+  }
+});
